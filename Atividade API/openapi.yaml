@@ -1,0 +1,279 @@
+openapi: 3.0.3
+info:
+  title: API INVENTECH - Controle de Estoque
+  description: API do sistema INVENTECH para gestão de suprimentos e controle de estoque de pastilhas industriais da DDA Metalúrgica.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Servidor de Desenvolvimento Local
+
+tags:
+  - name: Pastilhas
+    description: Gerenciamento do cadastro e estoque de pastilhas industriais.
+  - name: Fornecedores
+    description: Gerenciamento de fabricantes e fornecedores.
+  - name: Movimentacoes
+    description: Registro e auditoria de entradas e saídas de materiais.
+
+paths:
+  /pastilhas:
+    get:
+      summary: Lista todas as pastilhas cadastradas
+      description: Retorna o catálogo de pastilhas. Permite busca por código ou descrição via query parameters (RF03).
+      tags:
+        - Pastilhas
+      parameters:
+        - name: busca
+          in: query
+          description: Termo para busca por código ou descrição
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de pastilhas retornada com sucesso.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PastilhaResponse'
+    post:
+      summary: Cadastra uma nova pastilha
+      description: Cria um novo registro de pastilha no sistema (RF1).
+      tags:
+        - Pastilhas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PastilhaRequest'
+      responses:
+        '201':
+          description: Pastilha cadastrada com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PastilhaResponse'
+        '400':
+          description: Erro de validação nos dados enviados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErroResponse'
+
+  /pastilhas/{id}:
+    get:
+      summary: Busca uma pastilha pelo ID
+      tags:
+        - Pastilhas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID da pastilha
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Dados da pastilha.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PastilhaResponse'
+        '404':
+          description: Pastilha não encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErroResponse'
+    put:
+      summary: Atualiza os dados de uma pastilha
+      description: Permite editar os dados da pastilha, incluindo a parametrização do estoque mínimo (RF06).
+      tags:
+        - Pastilhas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PastilhaRequest'
+      responses:
+        '200':
+          description: Pastilha atualizada com sucesso.
+        '404':
+          description: Pastilha não encontrada.
+    delete:
+      summary: Exclui uma pastilha
+      description: Remove uma pastilha do catálogo (RF1).
+      tags:
+        - Pastilhas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Pastilha excluída com sucesso (sem conteúdo).
+        '404':
+          description: Pastilha não encontrada.
+
+  /movimentacoes:
+    post:
+      summary: Registra uma nova movimentação (Entrada/Saída)
+      description: Grava o registro imediato de entrada ou saída de materiais, atualizando o saldo em tempo real (RF04 e RF05).
+      tags:
+        - Movimentacoes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovimentacaoRequest'
+      responses:
+        '201':
+          description: Movimentação registrada com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovimentacaoResponse'
+        '400':
+          description: Erro de validação (ex. saldo insuficiente para saída).
+    get:
+      summary: Histórico de movimentações (Auditoria)
+      description: Retorna o histórico completo de entradas e saídas (RF08).
+      tags:
+        - Movimentacoes
+      responses:
+        '200':
+          description: Histórico de movimentações retornado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MovimentacaoResponse'
+
+components:
+  schemas:
+    PastilhaRequest:
+      type: object
+      required:
+        - codigo
+        - descricao
+        - estoqueMinimo
+      properties:
+        codigo:
+          type: string
+          example: "PST-1029"
+        descricao:
+          type: string
+          minLength: 5
+          example: "Pastilha de metal duro para torneamento"
+        estoqueMinimo:
+          type: integer
+          minimum: 1
+          example: 50
+        fornecedorId:
+          type: integer
+          format: int64
+          example: 1
+
+    PastilhaResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        codigo:
+          type: string
+          example: "PST-1029"
+        descricao:
+          type: string
+          example: "Pastilha de metal duro para torneamento"
+        saldoAtual:
+          type: integer
+          example: 120
+        estoqueMinimo:
+          type: integer
+          example: 50
+        alertaBaixoEstoque:
+          type: boolean
+          example: false
+
+    MovimentacaoRequest:
+      type: object
+      required:
+        - pastilhaId
+        - tipo
+        - quantidade
+        - usuarioResponsavel
+      properties:
+        pastilhaId:
+          type: integer
+          format: int64
+          example: 1
+        tipo:
+          type: string
+          enum: [ENTRADA, SAIDA]
+          example: "ENTRADA"
+        quantidade:
+          type: integer
+          minimum: 1
+          example: 100
+        usuarioResponsavel:
+          type: string
+          example: "João Marques"
+
+    MovimentacaoResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 99
+        pastilhaId:
+          type: integer
+          format: int64
+          example: 1
+        tipo:
+          type: string
+          example: "ENTRADA"
+        quantidade:
+          type: integer
+          example: 100
+        dataHora:
+          type: string
+          format: date-time
+          example: "2026-08-27T10:30:00Z"
+        usuarioResponsavel:
+          type: string
+          example: "João Marques"
+
+    ErroResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        mensagem:
+          type: string
+          example: "Erro de validação."
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-08-27T10:35:12Z"</span></pre>
+<p> </p>
